@@ -16,7 +16,7 @@ idna = "^3.4"
 httpcore = "^0.17.0"
 httpx = "^0.24.0"
 starlette = "^0.26.1"
-requests = "^2.30.0"
+requests = "^2.31.0"
 loguru = "^0.7.0"
 
 

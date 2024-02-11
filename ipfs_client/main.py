@@ -12,6 +12,10 @@ from ipfs_client.dag import DAGSection
 from ipfs_client.dag import IPFSAsyncClientError
 from ipfs_client.default_logger import logger
 from ipfs_client.settings.data_models import IPFSConfig
+from tenacity import retry
+from tenacity import retry_if_exception_type
+from tenacity import stop_after_attempt
+from tenacity import wait_random_exponential
 
 
 class AsyncIPFSClient:
@@ -121,6 +125,12 @@ class AsyncIPFSClient:
         # TODO
         pass
 
+    @retry(
+        reraise=True,
+        retry=retry_if_exception_type(Exception),
+        wait=wait_random_exponential(multiplier=1, max=10),
+        stop=stop_after_attempt(3)
+    )
     async def _pin_remote(self, cid):
         # curl -X POST "http://127.0.0.1:5001/api/v0/pin/remote/add?arg=<ipfs-path>&service=<value>&name=<value>&background=false"
         # pin to remote pinning service
@@ -130,7 +140,7 @@ class AsyncIPFSClient:
         if r.status_code != 200:
             self._logger.error(
                 f'IPFS client error: remote pinning add operation, response:{r}',
-            )          
+            )
 
     async def add_bytes(self, data: bytes, **kwargs):
         files = {'': data}

@@ -5,7 +5,6 @@ from httpx import AsyncClient
 from httpx import AsyncHTTPTransport
 from httpx import Limits
 from httpx import Timeout
-import asyncio
 import ipfs_client.exceptions
 import ipfs_client.utils.addr as addr_util
 from ipfs_client.dag import DAGSection
@@ -131,16 +130,22 @@ class AsyncIPFSClient:
         wait=wait_random_exponential(multiplier=1, max=10),
         stop=stop_after_attempt(3)
     )
-    async def _pin_remote(self, cid):
-        # curl -X POST "http://127.0.0.1:5001/api/v0/pin/remote/add?arg=<ipfs-path>&service=<value>&name=<value>&background=false"
-        # pin to remote pinning service
-        r = await self._client.post(
-                url=f'/pin/remote/add?arg={cid}&service={self._settings.remote_pinning.service_name}&background={self._settings.remote_pinning.background_pinning}',
-            )
-        if r.status_code != 200:
-            self._logger.error(
-                f'IPFS client error: remote pinning add operation, response:{r}',
-            )
+    async def pin_remote(self, cid):
+        if self._settings.remote_pinning.enabled:
+            # curl -X POST "http://127.0.0.1:5001/api/v0/pin/remote/add?arg=<ipfs-path>&service=<value>&name=<value>&background=false"
+            # pin to remote pinning service
+            try:
+                r = await self._client.post(
+                        url=f'/pin/remote/add?arg={cid}&service={self._settings.remote_pinning.service_name}&background={self._settings.remote_pinning.background_pinning}',
+                    )
+                if r.status_code != 200:
+                    raise IPFSAsyncClientError(
+                        f'IPFS client error: remote pinning operation, response:{r}',
+                    )
+            except Exception as e:
+                raise IPFSAsyncClientError(
+                    f'IPFS client error: remote pinning operation failed, error: {e}',
+                )
 
     async def add_bytes(self, data: bytes, **kwargs):
         files = {'': data}
@@ -159,9 +164,6 @@ class AsyncIPFSClient:
             return r.text
         else:
             generated_cid = resp['Hash']
-
-        if self._settings.remote_pinning.enabled:
-            asyncio.ensure_future(self._pin_remote(generated_cid))
 
         return generated_cid
 

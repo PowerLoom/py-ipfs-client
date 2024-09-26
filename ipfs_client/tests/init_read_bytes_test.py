@@ -26,7 +26,6 @@ async def test_upload_read_binary(binary_file_path):
             req_per_sec=10, burst=10,   # 10 requests per second, burst 10
         ),  # 10 requests per second, burst 10
         timeout=60,
-        local_cache_path='/tmp/ipfs_cache',
         connection_limits=ConnectionLimits(
             max_connections=10,
             max_keepalive_connections=5,

@@ -35,6 +35,5 @@ class IPFSConfig(BaseModel):
     reader_url_auth: Optional[ExternalAPIAuth] = None
     write_rate_limit: IPFSWriterRateLimit
     timeout: int
-    local_cache_path: str
     connection_limits: ConnectionLimits
     remote_pinning: RemotePinningConfig

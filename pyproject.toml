@@ -20,6 +20,7 @@ requests = "^2.30.0"
 loguru = "^0.7.0"
 validators = "^0.20.0"
 pydantic = "^1.10.8"
+aioboto3 = "^14.1.0"
 
 
 [build-system]

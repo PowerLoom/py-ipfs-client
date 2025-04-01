@@ -4,7 +4,7 @@ from ipfs_client.main import AsyncIPFSClientSingleton
 from ipfs_client.settings.data_models import ConnectionLimits
 from ipfs_client.settings.data_models import ExternalAPIAuth
 from ipfs_client.settings.data_models import IPFSConfig
-from ipfs_client.settings.data_models import IPFSWriterRateLimit
+from ipfs_client.settings.data_models import IPFSS3Config
 from ipfs_client.settings.data_models import RemotePinningConfig
 
 # run this test as:
@@ -23,9 +23,6 @@ async def test_read_from_cid():
     ipfs_client_settings = IPFSConfig(
         url=ipfs_url,
         reader_url=ipfs_url,
-        write_rate_limit=IPFSWriterRateLimit(
-            req_per_sec=10, burst=10,   # 10 requests per second, burst 10
-        ),  # 10 requests per second, burst 10
         timeout=60,
         connection_limits=ConnectionLimits(
             max_connections=10,
@@ -38,6 +35,13 @@ async def test_read_from_cid():
             service_endpoint=remote_pinning_service_endpoint,
             service_token=remote_pinning_service_token,
             background_pinning=False,
+        ),
+        s3=IPFSS3Config(
+            enabled=False,
+            endpoint_url='',
+            bucket_name='',
+            access_key='',
+            secret_key='',
         ),
     )
     if all([ipfs_auth_api_key, ipfs_auth_api_secret]):

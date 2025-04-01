@@ -71,6 +71,12 @@ class AsyncIPFSClient:
         self._settings = settings
         self._write_mode = write_mode
 
+        # Initialize S3 uploader if enabled
+        if settings.s3.enabled:
+            self._s3_uploader = S3Uploader(settings.s3)
+        else:
+            self._s3_uploader = None
+
     async def init_session(self):
         """
         Initialize the HTTP session for IPFS API communication.
@@ -362,12 +368,6 @@ class AsyncIPFSClientSingleton:
             addr=settings.reader_url, settings=settings, write_mode=False,
         )
         self._initialized = False
-        
-        # Initialize S3 uploader if enabled
-        if settings.s3.enabled:
-            self._s3_uploader = S3Uploader(settings.s3)
-        else:
-            self._s3_uploader = None
 
     async def init_sessions(self):
         """

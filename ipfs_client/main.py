@@ -226,7 +226,7 @@ class AsyncIPFSClient:
         
         # Upload to S3 if enabled
         if self._settings.s3.enabled:
-            self._s3_uploader.upload_file(generated_cid)
+            await self._s3_uploader.upload_file(data=data)
 
         # Pin to remote pinning service if enabled
         if self._settings.remote_pinning.enabled:

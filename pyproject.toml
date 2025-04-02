@@ -9,7 +9,7 @@ packages = [
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.8"
+python = "^3.10.13"
 multiaddr = "^0.0.9"
 appdirs = "^1.4.4"
 idna = "^3.4"
@@ -21,7 +21,14 @@ loguru = "^0.7.0"
 validators = "^0.20.0"
 pydantic = "^1.10.8"
 aioboto3 = "^14.1.0"
+python-dotenv = "^1.0.0"
+ipfs-cid = "^1.0.0"
+pre-commit = "^4.2.0"
 
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4.0"
+pytest-asyncio = "^0.21.1"
+pre-commit = "^4.2.0"
 
 [build-system]
 requires = ["poetry-core"]

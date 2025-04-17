@@ -38,13 +38,13 @@ async def test_s3_uploader():
     config = get_test_s3_config()
     print('Running test with S3 bucket:', config.bucket_name)
     uploader = S3Uploader(config)
-    text_upload = b'Hello, world!'
+    text_upload = b'Hello, world 1!'
     
     # Generate IPFS CID v1 for the test data
     expected_cid = cid_sha256_hash(text_upload)
     
     # Upload the data and get the returned CID
-    returned_cid = await uploader.upload_file(text_upload)
+    returned_cid = await uploader.upload_file(text_upload, file_name=expected_cid)
     
     # Verify that the returned CID matches our expected CID
     assert returned_cid == expected_cid, f"Expected CID {expected_cid}, got {returned_cid}"

@@ -5,12 +5,13 @@ A Python async client library for interacting with IPFS (InterPlanetary File Sys
 ## Features
 
 - **Fully Asynchronous**: Built on `httpx` and `asyncio` for high-performance I/O operations
-- **Content Management**: Add, retrieve, and pin content to IPFS
+- **Content Management**: Add, retrieve, pin, and remove content from IPFS
 - **DAG Support**: Work with IPFS DAG (Directed Acyclic Graph) structures
 - **Remote Pinning**: Integration with remote pinning services to ensure content persistence
 - **S3 Integration**: Store IPFS content in S3-compatible storage for better availability and retrieval
 - **Flexible Configuration**: Comprehensive settings for connection limits, timeouts, authentication, and more
 - **Separate Read/Write Clients**: Optimized client instances for read and write operations
+- **Multiaddr Support**: Connect to IPFS nodes using either URL or multiaddr formats
 
 ## Installation
 
@@ -64,6 +65,10 @@ async def main():
     # Retrieve the data from IPFS
     retrieved_data = await ipfs_client._ipfs_read_client.get_json(cid)
     print(f"Retrieved data: {retrieved_data}")
+    
+    # Remove data from IPFS (unpins from local node and remote pinning service if configured)
+    success = await ipfs_client._ipfs_write_client.remove_json(cid)
+    print(f"Data removal successful: {success}")
 
 if __name__ == "__main__":
     asyncio.run(main())
@@ -147,7 +152,7 @@ The library provides custom exceptions for different error scenarios:
 ```python
 from ipfs_client.dag import IPFSAsyncClientError
 from ipfs_client.exceptions import AddressError
-from ipfs_client.utils.s3 import S3UploadError
+from ipfs_client.utils.s3 import S3UploadError, S3DeleteError
 
 try:
     cid = await ipfs_client._ipfs_write_client.add_json({"test": "data"})
@@ -157,6 +162,25 @@ except IPFSAsyncClientError as e:
     print(f"IPFS operation failed: {str(e)}")
 except S3UploadError as e:
     print(f"S3 upload failed: {str(e)}")
+except S3DeleteError as e:
+    print(f"S3 delete operation failed: {str(e)}")
+```
+
+## Connection Management
+
+The client supports configurable connection limits for optimized performance:
+
+```python
+from ipfs_client.settings.data_models import ConnectionLimits
+
+# Custom connection limits
+conn_limits = ConnectionLimits(
+    max_connections=100,             # Maximum total connections in the pool
+    max_keepalive_connections=50,    # Maximum idle connections to keep alive
+    keepalive_expiry=300             # Time in seconds before an idle connection expires
+)
+
+ipfs_config.connection_limits = conn_limits
 ```
 
 ## Multiaddr Support
@@ -170,3 +194,54 @@ ipfs_config.url = "http://localhost:5001"
 # Multiaddr format
 ipfs_config.url = "/ip4/127.0.0.1/tcp/5001/http"
 ```
+
+## Running Tests
+
+The library includes a comprehensive test suite that verifies all the functionality works correctly. You can run the tests using Poetry:
+
+```bash
+# Run all tests
+poetry run pytest
+
+# Run specific test file
+poetry run pytest ipfs_client/tests/test_add_bytes.py
+
+# Run with verbose output
+poetry run pytest -v
+
+# Run with coverage report
+poetry run pytest --cov=ipfs_client
+```
+
+### Configuring the Test Environment
+
+Before running tests, you need to set up your test environment configuration. The tests look for environment variables specified in config files:
+
+1. Copy the example environment file to create your test configuration:
+
+```bash
+cp ipfs_client/tests/.env.test.s3uploader.example ipfs_client/tests/.env.test.s3uploader
+```
+
+2. Edit the `.env.test.s3uploader` file with your test IPFS and S3 configuration:
+
+```bash
+# IPFS S3-compatible service test configuration
+S3_ENDPOINT_URL=http://your-s3-endpoint
+S3_BUCKET_NAME=your-test-bucket
+S3_ACCESS_KEY=your-s3-access-key
+S3_SECRET_KEY=your-s3-secret-key
+
+# Remote pinning configuration
+REMOTE_PINNING_ENABLED=false
+REMOTE_PINNING_SERVICE_NAME=pinning-service-name
+REMOTE_PINNING_SERVICE_ENDPOINT=pinning-service-endpoint
+REMOTE_PINNING_SERVICE_TOKEN=pinning-service-token
+
+# IPFS node configuration (optional)
+IPFS_URL=http://localhost:5001
+IPFS_AUTH_API_KEY=your-api-key
+IPFS_AUTH_API_SECRET=your-api-secret
+```
+
+The tests will automatically load this configuration when run, and will fail if the environment file is not found.

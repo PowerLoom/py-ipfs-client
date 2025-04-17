@@ -226,7 +226,7 @@ class AsyncIPFSClient:
         
         # Upload to S3 if enabled
         if self._settings.s3.enabled:
-            await self._s3_uploader.upload_file(data=data)
+            await self._s3_uploader.upload_file(data=data, file_name=generated_cid)
 
         # Pin to remote pinning service if enabled
         if self._settings.remote_pinning.enabled:
@@ -239,6 +239,7 @@ class AsyncIPFSClient:
                     f'IPFS client error: remote pinning add operation, response:{r}',
                 )
         return generated_cid
+
 
     async def add_json(self, json_obj, **kwargs):
         """
@@ -337,6 +338,75 @@ class AsyncIPFSClient:
         except json.JSONDecodeError:
             # Return raw content if parsing fails
             return json_data
+
+    async def remove_bytes(self, cid, **kwargs):
+        """
+        Remove content from IPFS by its CID.
+        
+        This method unpins content from the local IPFS node. If remote pinning
+        is enabled, it also removes the content from the remote pinning service.
+        If S3 integration is enabled, it attempts to delete the content from S3.
+        
+        Args:
+            cid (str): The CID of the content to remove
+            **kwargs: Additional arguments to pass to the IPFS API
+            
+        Returns:
+            bool: True if the removal was successful, False otherwise
+            
+        Raises:
+            IPFSAsyncClientError: If the IPFS removal operation fails
+        """
+        # Ensure we're in write mode
+        if not self._write_mode:
+            raise IPFSAsyncClientError('Cannot remove content in read-only mode')
+            
+        # First, unpin from local node
+        r = await self._client.post(url=f'/pin/rm?arg={cid}')
+        if r.status_code != 200:
+            self._logger.error(
+                f'IPFS client error: local pin removal operation for CID {cid}, response:{r}',
+            )
+            return False
+            
+        # Remove from remote pinning service if enabled
+        if self._settings.remote_pinning.enabled:
+            r = await self._client.post(
+                url=f'/pin/remote/rm?arg={cid}&service={self._settings.remote_pinning.service_name}',
+            )
+            if r.status_code != 200:
+                self._logger.error(
+                    f'IPFS client error: remote pin removal operation for CID {cid}, response:{r}',
+                )
+                
+        # Delete from S3 if enabled
+        if self._settings.s3.enabled and self._s3_uploader:
+            try:
+                await self._s3_uploader.delete_file(file_name=cid)
+            except Exception as e:
+                self._logger.error(
+                    f'S3 deletion error for CID {cid}: {str(e)}',
+                )
+                
+        return True
+
+    async def remove_json(self, cid, **kwargs):
+        """
+        Remove JSON content from IPFS by its CID.
+        
+        This is a convenience wrapper around remove_bytes specifically for JSON content.
+        
+        Args:
+            cid (str): The CID of the JSON content to remove
+            **kwargs: Additional arguments to pass to the remove_bytes method
+            
+        Returns:
+            bool: True if the removal was successful, False otherwise
+            
+        Raises:
+            IPFSAsyncClientError: If the IPFS removal operation fails
+        """
+        return await self.remove_bytes(cid, **kwargs)
 
 
 class AsyncIPFSClientSingleton:

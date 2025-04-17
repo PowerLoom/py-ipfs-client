@@ -18,6 +18,16 @@ class S3UploadError(Exception):
     pass
 
 
+class S3DeleteError(Exception):
+    """
+    Custom exception for S3 delete errors.
+    
+    Raised when a delete operation from S3 fails and cannot be recovered
+    through the retry mechanism.
+    """
+    pass
+
+
 def log_retry(retry_state):
     """
     Log retry attempts for better observability.
@@ -88,6 +98,7 @@ class S3Uploader:
     async def upload_file(
         self,
         data: bytes,
+        file_name: str,
     ) -> str:
         """
         Upload file to S3 with retry logic.
@@ -109,13 +120,10 @@ class S3Uploader:
             # Get or create S3 client
             client = await self._ensure_client()
             
-            # Generate a unique filename to avoid collisions
-            random_filename = f'{uuid.uuid4()}.json'
-            
             # Upload the object to S3
             response = await client.put_object(
                 Bucket=self.config.bucket_name,
-                Key=random_filename,
+                Key=file_name,
                 Body=data,
                 Metadata={
                     'cid-version': '1',  # Set CID version metadata
@@ -124,7 +132,7 @@ class S3Uploader:
 
             # Extract the CID from the response metadata
             cid = response['ResponseMetadata']['HTTPHeaders']['x-amz-meta-cid']
-            logger.success('Successfully uploaded file {} with CID: {}', random_filename, cid)
+            logger.success('Successfully uploaded file {} with CID: {}', file_name, cid)
             return cid
 
         except ParamValidationError as e:
@@ -143,3 +151,53 @@ class S3Uploader:
             logger.exception('Unexpected error during upload')
             self.client = None  # Reset client on error
             raise S3UploadError(f'Upload failed: {str(e)}')
+
+    async def delete_file(
+        self,
+        file_name: str,
+    ) -> bool:
+        """
+        Delete file from S3 with retry logic.
+        
+        This method handles deleting a file from the configured S3 bucket.
+        It implements the same error handling approach as upload operations.
+        
+        Args:
+            file_name (str): Name of the file to delete
+            
+        Returns:
+            bool: True if deletion was successful
+            
+        Raises:
+            S3DeleteError: If deletion fails after all retries
+            ValueError: If input validation fails
+        """
+        try:
+            # Get or create S3 client
+            client = await self._ensure_client()
+            
+            # Delete the object from S3
+            await client.delete_object(
+                Bucket=self.config.bucket_name,
+                Key=file_name,
+            )
+
+            logger.success('Successfully deleted file {}', file_name)
+            return True
+
+        except ParamValidationError as e:
+            # Handle validation errors (non-retryable)
+            logger.error('Parameter validation error: {}', str(e))
+            raise ValueError(f'Invalid parameters: {str(e)}')
+
+        except (ClientError, ConnectionError) as e:
+            # Handle AWS-specific errors (retryable)
+            logger.error('S3 delete operation failed: {}', str(e))
+            self.client = None  # Reset client on error to force recreation
+            raise
+
+        except Exception as e:
+            # Handle unexpected errors (non-retryable)
+            logger.exception('Unexpected error during deletion')
+            self.client = None  # Reset client on error
+            raise S3DeleteError(f'Delete failed: {str(e)}')

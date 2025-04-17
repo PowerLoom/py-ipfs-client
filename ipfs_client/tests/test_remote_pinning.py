@@ -1,4 +1,8 @@
 import os
+from pathlib import Path
+
+import pytest
+from dotenv import load_dotenv
 
 from ipfs_client.main import AsyncIPFSClientSingleton
 from ipfs_client.settings.data_models import ConnectionLimits
@@ -6,17 +10,17 @@ from ipfs_client.settings.data_models import ExternalAPIAuth
 from ipfs_client.settings.data_models import IPFSConfig
 from ipfs_client.settings.data_models import IPFSS3Config
 from ipfs_client.settings.data_models import RemotePinningConfig
-from dotenv import load_dotenv
-from pathlib import Path
-import pytest
+
 
 @pytest.mark.asyncio
 async def test_remote_pinning():
     # Load test-specific environment variables
     test_env_path = Path(__file__).parent / '.env.test.s3uploader'
     if not test_env_path.exists():
-        raise FileNotFoundError(f'❌ Test environment file not found at {test_env_path}')
-    
+        raise FileNotFoundError(
+            f'❌ Test environment file not found at {test_env_path}',
+        )
+
     load_dotenv(test_env_path)
 
     # get from env variables
@@ -31,7 +35,9 @@ async def test_remote_pinning():
     ipfs_client_settings = IPFSConfig(
         url=ipfs_url,
         reader_url=ipfs_url,
-        url_auth=ExternalAPIAuth(apiKey=ipfs_auth_api_key, apiSecret=ipfs_auth_api_secret),
+        url_auth=ExternalAPIAuth(
+            apiKey=ipfs_auth_api_key, apiSecret=ipfs_auth_api_secret,
+        ),
         timeout=60,
         connection_limits=ConnectionLimits(
             max_connections=100,
@@ -51,7 +57,7 @@ async def test_remote_pinning():
             bucket_name=bucket_name,
             access_key=access_key,
             secret_key=secret_key,
-        )
+        ),
     )
     if all([ipfs_auth_api_key, ipfs_auth_api_secret]):
         ipfs_client_settings.url_auth = ExternalAPIAuth(

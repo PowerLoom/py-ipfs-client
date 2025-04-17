@@ -50,22 +50,22 @@ async def main():
             enabled=False,                        # Enable for S3 integration
         ),
     )
-    
+
     # Create the client singleton
     ipfs_client = AsyncIPFSClientSingleton(settings=ipfs_config)
-    
+
     # Initialize client sessions (must be called before any operations)
     await ipfs_client.init_sessions()
-    
+
     # Add JSON data to IPFS
     data = {"example": "Hello IPFS!"}
     cid = await ipfs_client._ipfs_write_client.add_json(data)
     print(f"Added data with CID: {cid}")
-    
+
     # Retrieve the data from IPFS
     retrieved_data = await ipfs_client._ipfs_read_client.get_json(cid)
     print(f"Retrieved data: {retrieved_data}")
-    
+
     # Remove data from IPFS (unpins from local node and remote pinning service if configured)
     success = await ipfs_client._ipfs_write_client.remove_json(cid)
     print(f"Data removal successful: {success}")
@@ -87,7 +87,7 @@ ipfs_config.url_auth = ExternalAPIAuth(
     apiSecret="your_api_secret"
 )
 ipfs_config.reader_url_auth = ExternalAPIAuth(
-    apiKey="your_api_key", 
+    apiKey="your_api_key",
     apiSecret="your_api_secret"
 )
 ```

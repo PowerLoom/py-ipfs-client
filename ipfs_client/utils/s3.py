@@ -11,8 +11,18 @@ from ipfs_client.settings.data_models import IPFSS3Config
 class S3UploadError(Exception):
     """
     Custom exception for S3 upload errors.
-    
+
     Raised when an upload operation to S3 fails and cannot be recovered
+    through the retry mechanism.
+    """
+    pass
+
+
+class S3DeleteError(Exception):
+    """
+    Custom exception for S3 delete errors.
+
+    Raised when a delete operation from S3 fails and cannot be recovered
     through the retry mechanism.
     """
     pass
@@ -21,7 +31,7 @@ class S3UploadError(Exception):
 def log_retry(retry_state):
     """
     Log retry attempts for better observability.
-    
+
     Args:
         retry_state: The current state of the retry, containing information
                     about the function being retried and attempt number.
@@ -34,15 +44,15 @@ def log_retry(retry_state):
 class S3Uploader:
     """
     Handles uploading files to S3-compatible storage with retry logic.
-    
+
     This class provides functionality to store IPFS content in S3-compatible
     storage for better persistence and retrieval performance.
     """
-    
+
     def __init__(self, config: IPFSS3Config):
         """
         Initialize S3Uploader with configuration.
-        
+
         Args:
             config (IPFSS3Config): Configuration dataclass containing S3 settings
                                   including endpoint URL, bucket name, and credentials.
@@ -54,10 +64,10 @@ class S3Uploader:
     def _create_client(self):
         """
         Create a new S3 client using the configured settings.
-        
+
         Returns:
             An aioboto3 S3 client context manager
-            
+
         Raises:
             S3UploadError: If client creation fails
         """
@@ -75,9 +85,9 @@ class S3Uploader:
     async def _ensure_client(self):
         """
         Ensure client exists and create if necessary.
-        
+
         This method lazily initializes the S3 client on first use.
-        
+
         Returns:
             An initialized S3 client
         """
@@ -88,19 +98,20 @@ class S3Uploader:
     async def upload_file(
         self,
         data: bytes,
+        file_name: str,
     ) -> str:
         """
         Upload file to S3 with retry logic.
-        
+
         This method handles uploading binary data to the configured S3 bucket.
         It implements exponential backoff retry logic for transient failures.
-        
+
         Args:
             data (bytes): Binary data to upload to S3
-            
+
         Returns:
             str: Content ID (CID) of uploaded file
-            
+
         Raises:
             S3UploadError: If upload fails after all retries
             ValueError: If input validation fails
@@ -108,14 +119,11 @@ class S3Uploader:
         try:
             # Get or create S3 client
             client = await self._ensure_client()
-            
-            # Generate a unique filename to avoid collisions
-            random_filename = f'{uuid.uuid4()}.json'
-            
+
             # Upload the object to S3
             response = await client.put_object(
                 Bucket=self.config.bucket_name,
-                Key=random_filename,
+                Key=file_name,
                 Body=data,
                 Metadata={
                     'cid-version': '1',  # Set CID version metadata
@@ -124,7 +132,9 @@ class S3Uploader:
 
             # Extract the CID from the response metadata
             cid = response['ResponseMetadata']['HTTPHeaders']['x-amz-meta-cid']
-            logger.success('Successfully uploaded file {} with CID: {}', random_filename, cid)
+            logger.success(
+                'Successfully uploaded file {} with CID: {}', file_name, cid,
+            )
             return cid
 
         except ParamValidationError as e:
@@ -143,3 +153,53 @@ class S3Uploader:
             logger.exception('Unexpected error during upload')
             self.client = None  # Reset client on error
             raise S3UploadError(f'Upload failed: {str(e)}')
+
+    async def delete_file(
+        self,
+        file_name: str,
+    ) -> bool:
+        """
+        Delete file from S3 with retry logic.
+
+        This method handles deleting a file from the configured S3 bucket.
+        It implements the same error handling approach as upload operations.
+
+        Args:
+            file_name (str): Name of the file to delete
+
+        Returns:
+            bool: True if deletion was successful
+
+        Raises:
+            S3DeleteError: If deletion fails after all retries
+            ValueError: If input validation fails
+        """
+        try:
+            # Get or create S3 client
+            client = await self._ensure_client()
+
+            # Delete the object from S3
+            await client.delete_object(
+                Bucket=self.config.bucket_name,
+                Key=file_name,
+            )
+
+            logger.success('Successfully deleted file {}', file_name)
+            return True
+
+        except ParamValidationError as e:
+            # Handle validation errors (non-retryable)
+            logger.error('Parameter validation error: {}', str(e))
+            raise ValueError(f'Invalid parameters: {str(e)}')
+
+        except (ClientError, ConnectionError) as e:
+            # Handle AWS-specific errors (retryable)
+            logger.error('S3 delete operation failed: {}', str(e))
+            self.client = None  # Reset client on error to force recreation
+            raise
+
+        except Exception as e:
+            # Handle unexpected errors (non-retryable)
+            logger.exception('Unexpected error during deletion')
+            self.client = None  # Reset client on error
+            raise S3DeleteError(f'Delete failed: {str(e)}')
